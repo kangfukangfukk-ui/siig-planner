@@ -1,0 +1,251 @@
+// Prisma schema for SIIG Personal Financial Planning App
+// Built for Next.js 16, TypeScript, PostgreSQL, and Prisma ORM.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+}
+
+enum BudgetPeriod {
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+}
+
+enum GoalStatus {
+  PLANNED
+  IN_PROGRESS
+  ACHIEVED
+}
+
+enum GoalType {
+  EDUCATION
+  RETIREMENT
+  PURCHASE
+  EMERGENCY
+  OTHER
+}
+
+enum ScenarioStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum PolicyType {
+  LIFE
+  HEALTH
+  DISABILITY
+  CRITICAL_ILLNESS
+}
+
+enum LiabilityType {
+  MORTGAGE
+  LOAN
+  CREDIT
+  OTHER
+}
+
+enum AssetType {
+  CASH
+  INVESTMENT
+  PROPERTY
+  VEHICLE
+  OTHER
+}
+
+enum RelationshipType {
+  SELF
+  SPOUSE
+  CHILD
+  OTHER
+}
+
+enum RiskTolerance {
+  CONSERVATIVE
+  MODERATE
+  AGGRESSIVE
+}
+
+model User {
+  id          String      @id @default(uuid())
+  email       String      @unique
+  passwordHash String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  lastLoginAt DateTime?
+  profiles    Profile[]
+  auditLogs   AuditLog[]
+}
+
+model Profile {
+  id                String             @id @default(uuid())
+  userId            String
+  name              String
+  birthdate         DateTime?
+  relationship      RelationshipType?
+  incomeMonthly     Decimal?           @db.Decimal(18, 2)
+  riskTolerance     RiskTolerance?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assets            Asset[]
+  liabilities       Liability[]
+  transactions      Transaction[]
+  budgets           Budget[]
+  goals             Goal[]
+  scenarios         Scenario[]
+  insurancePolicies InsurancePolicy[]
+
+  @@index([userId])
+}
+
+model Asset {
+  id         String   @id @default(uuid())
+  profileId  String
+  type       AssetType
+  name       String
+  category   String?
+  value      Decimal  @db.Decimal(18, 2)
+  currency   String   @default("THB")
+  acquiredAt DateTime?
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  profile    Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+}
+
+model Liability {
+  id             String   @id @default(uuid())
+  profileId      String
+  type           LiabilityType
+  name           String
+  balance        Decimal  @db.Decimal(18, 2)
+  interestRate   Decimal? @db.Decimal(5, 2)
+  monthlyPayment Decimal? @db.Decimal(18, 2)
+  dueDate        DateTime?
+  maturityDate   DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  profile        Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+}
+
+model Transaction {
+  id          String          @id @default(uuid())
+  profileId   String
+  date        DateTime
+  type        TransactionType
+  category    String
+  amount      Decimal         @db.Decimal(18, 2)
+  currency    String          @default("THB")
+  description String?
+  account     String?
+  budgetId    String?
+  goalId      String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  profile     Profile         @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  budget      Budget?         @relation(fields: [budgetId], references: [id], onDelete: SetNull)
+  goal        Goal?           @relation(fields: [goalId], references: [id], onDelete: SetNull)
+
+  @@index([profileId])
+  @@index([date])
+}
+
+model Budget {
+  id           String        @id @default(uuid())
+  profileId    String
+  name         String
+  category     String
+  amount       Decimal       @db.Decimal(18, 2)
+  period       BudgetPeriod
+  startDate    DateTime
+  endDate      DateTime?
+  actualSpent  Decimal       @db.Decimal(18, 2) @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  profile      Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([profileId])
+}
+
+model Goal {
+  id                  String      @id @default(uuid())
+  profileId           String
+  name                String
+  targetAmount        Decimal     @db.Decimal(18, 2)
+  currentAmount       Decimal     @db.Decimal(18, 2) @default(0)
+  targetDate          DateTime
+  monthlyContribution Decimal?    @db.Decimal(18, 2)
+  priority            Int?
+  status              GoalStatus  @default(PLANNED)
+  goalType            GoalType
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  profile             Profile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  transactions        Transaction[]
+
+  @@index([profileId])
+}
+
+model Scenario {
+  id         String         @id @default(uuid())
+  profileId  String
+  name       String
+  description String?
+  snapshot   Json?
+  status     ScenarioStatus @default(DRAFT)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  profile    Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+}
+
+model InsurancePolicy {
+  id             String   @id @default(uuid())
+  profileId      String
+  provider       String
+  policyNumber   String?
+  policyType     PolicyType
+  coverageAmount Decimal  @db.Decimal(18, 2)
+  premium        Decimal  @db.Decimal(18, 2)
+  renewalDate    DateTime?
+  termYears      Int?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  profile        Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  action     String
+  entity     String
+  entityId   String?
+  changes    Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
